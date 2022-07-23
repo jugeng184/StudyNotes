@@ -497,3 +497,157 @@ balance := [...]float32{1000.0, 2.0, 3.4, 7.0, 50.0} //balance := [...]float32{1
 ```go
 var salary float32 = balance[9]
 ```
+
+#### 10、切片 Slice
+
+Go 数组的长度不可改变，在特定场景中这样的集合就不太适用，Go 中提供了一种灵活，功能强悍的内置类型切片("动态数组")，与数组相比切片的长度是不固定的，可以追加元素，在追加时可能使切片的容量增大。
+
+- 定义切片
+
+```
+var identifier []type    //声明一个未指定大小的数组来定义切片：
+slice1 := make([]type, len) //使用 make() 函数来创建切片,这里 len 是数组的长度并且也是切片的初始长度。
+```
+
+- 切片初始化
+
+```
+ s :=[] int {1,2,3 }    //直接初始化切片，[] 表示是切片类型，{1,2,3} 初始化值依次是 1,2,3，其 cap=len=3。
+ s := arr[startIndex:endIndex] //将 arr 中从下标 startIndex 到 endIndex-1 下的元素创建为一个新的切片。
+ s1 := s[startIndex:endIndex]  //通过切片 s 初始化切片 s1。
+```
+
+- 切片是可索引的，并且可以由 len() 方法获取长度。切片提供了计算容量的方法 cap() 可以测量切片最长可以达到多少。
+
+- append() 和 copy() 函数
+
+```
+var** numbers []int
+printSlice(numbers)
+
+/*允许追加空切片 */
+numbers = append(numbers, 0)
+/* 向切片添加一个元素 */
+numbers = append(numbers, 1)
+/* 同时添加多个元素 */
+numbers = append(numbers, 2,3,4)
+/* 创建切片 numbers1 是之前切片的两倍容量*/
+numbers1 := make([]int, len(numbers), (cap(numbers))*2)
+/* 拷贝 numbers 的内容到 numbers1 */
+copy(numbers1,numbers)
+```
+
+#### 11、Range
+
+Go 语言中 **range 关键字用于 for 循环中迭代数组(array)、切片(slice)、通道(channel)或集合(map)的元素**。在数组和切片中它返回元素的索引和索引对应的值，在集合中返回 key-value 对。
+
+for 循环的 range 格式可以对 slice、map、数组、字符串等进行迭代循环。格式如下：
+
+```go
+for key, value := range oldMap {
+    newMap[key] = value
+}
+for key := range oldMap  //只想读取 key
+for _, value := range oldMap //只想读取 value
+```
+
+#### 12、Map
+
+Map是一种无序的键对的集合。Map最重要的一点是通过key来检索数据，key类似索引，指向快速值的数据。Map 是使用哈希表来实现的。
+
+- 定义map
+
+```
+/* 声明变量，默认 map 是 nil */
+var map_variable map[key_data_type]value_data_type
+
+/* 使用 make 函数 */
+map_variable := make(map[key_data_type]value_data_type)
+/*创建集合 */
+var countryCapitalMap map[string]string 
+/* map插入key - value对,各个国家对应的首都 */
+countryCapitalMap = make(map[string]string)
+countryCapitalMap [ "France" ] = "巴黎"
+countryCapitalMap [ "Italy" ] = "罗马"
+```
+
+- delete（）函数
+
+delete() 函数用于删除集合的元素, 参数为 map 和其对应的 key。实例如下：
+
+```
+delete(countryCapitalMap, "France")     //删除元素
+```
+
+#### 13、指针
+
+变量是一种使用方便的占位符，用于引用计算机内存地址。
+
+Go 语言的取地址符是 &，放到一个变量前使用就会返回相应变量的内存地址。
+
+一个指针变量指向了一个值的内存地址。
+
+- 类似于变量和常量，在使用指针前你需要声明指针。指针声明格式如下：
+
+```
+var var_name *var-type
+var ip *int        /* 指向整型*/
+var fp *float32    /* 指向浮点型 */
+```
+
+- 在指针类型前面加上 * 号（前缀）来获取指针所指向的内容。
+
+- 空指针
+
+当一个指针被定义后没有分配到任何变量时，它的值为 nil。
+
+```
+if(ptr != nil)     /* ptr 不是空指针 */
+if(ptr == nil)    /* ptr 是空指针 */
+```
+
+#### 14、并发
+
+Go 语言支持并发，我们只需要通过 go 关键字来开启 goroutine 即可。
+
+goroutine 是轻量级线程，goroutine 的调度是由 Golang 运行时进行管理的。
+
+- goroutine 语法格式：
+
+```
+go 函数名( 参数列表 )
+go f(x, y, z)  //开启一个新的 goroutine
+```
+
+Go 允许使用 go 语句开启一个新的运行期线程， 即 goroutine，以一个不同的、新创建的 goroutine 来执行一个函数。 同一个程序中的所有 goroutine 共享同一个地址空间。
+
+- 通道（channel）是用来传递数据的一个数据结构。通道可用于两个 goroutine 之间通过传递一个指定类型的值来同步运行和通讯。操作符 `<-` 用于指定通道的方向，发送或接收。如果未指定方向，则为双向通道。
+
+```
+ch := make(chan int)  //声明一个通道很简单，我们使用chan关键字即可，通道在使用前必须先创建：
+ch <- v    // 把 v 发送到通道 ch
+v := <-ch  // 从 ch 接收数据
+           // 并把值赋给 v
+```
+
+1. 默认情况下，通道是不带缓冲区的。发送端发送数据，同时必须有接收端相应的接收数据。
+
+通道可以设置缓冲区，通过 make 的第二个参数指定缓冲区大小：
+
+```
+ch := make(chan int, 100)
+```
+
+​    2.带缓冲区的通道允许发送端的数据发送和接收端的数据获取处于异步状态，就是说发送端发送的数据可以放在缓冲区里面，可以等待接收端去获取数据，而不是立刻需要接收端去获取数据。
+
+不过由于缓冲区的大小是有限的，所以还是必须有接收端来接收数据的，否则缓冲区一满，数据发送端就无法再发送数据了。
+
+如果通道不带缓冲，发送方会阻塞直到接收方从通道中接收了值。如果通道带缓冲，发送方则会阻塞直到发送的值被拷贝到缓冲区内；如果缓冲区已满，则意味着需要等待直到某个接收方获取到一个值。接收方在有值可以接收之前会一直阻塞。
+
+​     3.Go 通过 range 关键字来实现遍历读取到的数据，类似于与数组或切片。格式如下：
+
+```
+v, ok := <-ch
+```
+
+如果通道接收不到数据后 ok 就为 false，这时通道就可以使用 **close()** 函数来关闭。
