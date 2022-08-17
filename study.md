@@ -1012,3 +1012,264 @@ Switch State Service，包含一组工具，以允许所有SONiC模块之间进�
 IntfMgrd: 对到达APPL_DB、CONFIG_DB、STATE_DB的状态做出反应来配置Linux内核接口。这一步只在没有状态冲突或者状态不一致的情况下完成。
 
 VlanMgrd: 对到达APPL_DB、CONFIG_DB、STATE_DB的状态做出反应来配置Linux内核vlan接口。只有在没有任何依赖状态/条件被满足时，才会执行此步骤。
+
+#### 4、Dhcp-relay设计
+
+1、定义
+
+DHCP：动态主机配置协议
+
+2、功能
+
+SONiC 中的 DHCP Relay for IPv6 功能应满足以下功能要求：
+
+- 支持使用 IPv6 地址将 DHCP 数据包从下游网络中继到上游网络。
+- 提供作为在 dhcp-relay docker 容器上运行的单独进程的功能。
+- 将消息中继到多个单播和多播地址。
+
+3、配置
+
+Config DB schema 应符合以下格式：
+
+```
+{
+"VLAN": {
+  "Vlan1000": {
+    "dhcp_servers": [
+      "192.0.0.1", 
+      "192.0.0.2", 
+    ], 
+    "dhcpv6_servers": [ 
+      "21da:d3:0:2f3b::7", 
+      "21da:d3:0:2f3b::6", 
+    ], 
+    "vlanid": "1000" 
+    } 
+  }
+}
+```
+
+3、模块设计
+
+![DHCPv6 图](https://github.com/sonic-net/SONiC/raw/master/doc/DHCPv6_Relay/diagram.png)
+
+- dhcp-relay容器中IPV6进程的DHCP中继：一个新进程将与另一个进程并行运行以支持 IPv4。新进程将侦听 IPv6 的 DHCP 数据包，并根据配置将它们转发到相关接口。例如，3描述的配置，将启动以下守护程序：
+
+  ```
+  admin@sonic:/# /usr/sbin/dhcrelay -6 -d --name-alias-map-file /tmp/port-name-alias-map.txt -l Vlan1000 -u 21da:d3:0:2f3b::7%Ethernet28 -u 21da:d3:0:2f3b::6%Ethernet28
+  ```
+
+4、Sonic-cli命令行配置vlan常用命令
+
+sonic-cli支持配置 DHCP IPv6 以及 IPv4 支持
+
+- 配置 vlan dhcp_relay 添加用法
+
+```
+ config vlan dhcp_relay add <vlan_id> <dhcp_relay_destination_ip>
+```
+
+- 配置 vlan dhcp_relay 删除
+
+```
+config vlan dhcp_relay del <vlan-id> <dhcp_relay_destination_ip>
+```
+
+- 显示 vlan 
+
+```
+show vlan brief
+```
+
+```
+//例子
+admin@sonic:~$ show vlan brief
++-----------+----------------------+------------+----------------+-----------------------+-------------+
+|   VLAN ID | IP Address           | Ports      | Port Tagging   | DHCP Helper Address   | Proxy ARP   |
++===========+======================+============+================+=======================+=============+
+|      1000 | 21da:d3:0:2f3b::6/96 | Ethernet28 | untagged       | 21da:d3:0:2f3b::6     | disabled    |
+|           |                      |            |                | 21da:d3:0:2f3b::7     |             |
++-----------+----------------------+------------+----------------+-----------------------+-------------+
+```
+
+#### 5、网路知识
+
+- 交换机
+
+交换是按照通信两端传输信息的需要，用人工或设备自动完成的方法，把要传输的信息送到符合要求的相应[路由](https://baike.baidu.com/item/路由)上的技术的统称。交换机根据工作位置的不同，可以分为广域网交换机和[局域网交换机](https://baike.baidu.com/item/局域网交换机)。广域的交换机就是一种在[通信系统](https://baike.baidu.com/item/通信系统)中完成[信息交换](https://baike.baidu.com/item/信息交换)功能的设备，它应用在[数据链路层](https://baike.baidu.com/item/数据链路层)。交换机有多个端口，每个端口都具有[桥接](https://baike.baidu.com/item/桥接)功能，可以连接一个[局域网](https://baike.baidu.com/item/局域网)或一台高性能服务器或工作站。实际上，交换机有时被称为多[端口](https://baike.baidu.com/item/端口)网桥。
+
+- 网关
+
+网关实质上是一个网络通向其他网络的[IP地址](https://baike.baidu.com/item/IP地址)。比如有网络A和网络B，网络A的[IP](https://baike.baidu.com/item/IP)地址范围为“192.168.1.1~192. 168.1.254”，[子网掩码](https://baike.baidu.com/item/子网掩码)为255.255.255.0；网络B的IP地址范围为“192.168.2.1~192.168.2.254”，[子网掩码](https://baike.baidu.com/item/子网掩码/100207)为255.255.255.0。在没有[路由器](https://baike.baidu.com/item/路由器)的情况下，两个网络之间是不能进行TCP/IP通信的，即使是两个网络连接在同一台[交换机](https://baike.baidu.com/item/交换机)（或[集线器](https://baike.baidu.com/item/集线器)）上，[TCP/IP协议](https://baike.baidu.com/item/TCP%2FIP协议/212915)也会根据[子网掩码](https://baike.baidu.com/item/子网掩码)（255.255.255.0）与主机的IP 地址作 “与” 运算的结果不同判定两个网络中的主机处在不同的网络里。而要实现这两个网络之间的通信，则必须通过网关。如果网络A中的主机发现[数据包](https://baike.baidu.com/item/数据包)的目的主机不在本地网络中，就把数据包转发给它自己的网关，再由网关转发给网络B的网关，网络B的网关再转发给网络B的某个主机。这就是网络A向网络B转发数据包的过程。
+
+- 网卡
+
+网卡是一块被设计用来允许计算机在[计算机网络](https://baike.baidu.com/item/计算机网络/18763)上进行通讯的[计算机硬件](https://baike.baidu.com/item/计算机硬件/5459592)。由于其拥有[MAC地址](https://baike.baidu.com/item/MAC地址/1254181)，因此属于[OSI模型](https://baike.baidu.com/item/OSI模型/10119902)的第1层和2层之间。它使得用户可以通过电缆或无线相互连接。
+
+- DHCP
+
+DHCP（Dynamic Host Configuration Protocol，[动态主机配置协议](https://baike.baidu.com/item/动态主机配置协议/10778663)）通常被应用在大型的局域网络环境中，主要作用是集中地管理、分配IP地址，使网络环境中的主机动态的获得IP地址、Gateway地址、DNS服务器地址等信息，并能够提升地址的使用率。
+
+#### 6、sonic命令
+
+**1.ssh登录**
+
+```
+At Console:
+Debian GNU/Linux 9 sonic ttyS1
+
+sonic login: admin
+Password: YourPaSsWoRd
+
+SSH from any remote server to sonic can be done by connecting to SONiC IP
+user@debug:~$ ssh admin@sonic_ip_address(or SONIC DNS Name)
+admin@sonic's password:
+```
+
+2.SONiC 中的管理接口 (eth0) 配置为（默认情况下）使用 DHCP 客户端从 DHCP 服务器获取 IP 地址。将管理接口连接到您的 DHCP 服务器所连接的同一网络，并从 DHCP 服务器获取 IP 地址。可以使用`/sbin/ifconfig eth0`Linux 命令验证从 DHCP 服务器接收到的 IP 地址。
+
+**为管理接口配置静态 IP 地址:**
+
+```
+config interface ip add eth0
+例子：
+admin@sonic:~$ sudo config interface ip add eth0 20.11.12.13/24 20.11.12.254
+```
+
+配置 IP 地址后，可以使用`show management_interface address`命令或`/sbin/ifconfig eth0`linux 命令进行验证。用户可以从他们的管理网络通过 SSH 登录到这个管理接口 IP 地址。
+
+```
+admin@sonic:~$ /sbin/ifconfig eth0
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+      inet 10.11.11.13  netmask 255.255.255.0  broadcast 10.11.12.255
+```
+
+**3.配置 --帮助**
+
+```
+配置帮助：config --help  
+显示帮助：show (-?|-h|--help)
+例子：show interfaces -?
+显示版本：show version
+显示时钟：show clock
+显示当前操作系统镜像：show boot
+显示平台环境：show environment
+显示上次重新启动的原因：show reboot-cause
+显示以前重新启动的历史记录：show reboot-cause history
+显示当前系统正常运行时间：show uptime
+显示日志记录：
+show logging [(<process_name> [-l|--lines <number_of_lines>]) | (-f|--follow)]
+例子：admin@sonic:~$ show logging sensord //指定进程名称，以便仅显示提及该进程的日志消息
+admin@sonic:~$ show logging --lines 50 //可以使用-lor--lines选项指定要显示的行数。只会显示最近的 N 行。
+```
+
+4.AAA显示命令、配置命令
+
+此命令用于查看网络节点中配置的身份验证、授权和记帐设置。
+
+```
+show aaa
+aaa 身份验证故障转移：启用或禁用故障通过选项。当用户配置了多个 tacacs+ 服务器并且用户启用了 tacacs+ 身份验证时，此命令很有用。
+config aaa authentication failthrough (enable | disable | default)
+aaa认证登录
+config aaa authentication (tacacs+ | local | default)
+tacacs+：启用基于 tacacs+ 的远程认证
+local：禁用远程认证，使用本地认证
+默认值：重置为默认值，这只是“本地”身份验证
+```
+
+5.TACACS+显示、配置命令
+
+```
+show tacacs
+配置 tacacs 添加：此命令用于将 TACACS+ 服务器添加到 tacacs 服务器列表。请注意，设备中可以添加多个 tacacs+（最多七个）。当用户尝试登录时，tacacs 客户端会与服务器一一联系：
+config tacacs add <ip_address> [-t|--timeout <seconds>] [-k|--key <secret>] [-a|--type <type>] [-o|--port <port>] [-p|--pri <priority>] [-m|--use-mgmt-vrf]
+删除配置的 tacacs+ 服务器：
+config tacacs delete <ip_address>
+```
+
+6.ACL 显示命令、配置命令
+
+7.ARP & NDP
+
+8.BFD显示命令、配置命令
+
+9.BGP
+
+10.控制台配置命令
+
+11.控制台连接命令
+
+12.DHCP中继命令
+
+13.丢弃计数器显示和配置命令
+
+14.动态缓冲区管理
+
+15.ECN（显式拥塞通知）显示和配置命令
+
+16.配置接口
+
+17.变速箱
+
+18.IP/IPV6
+
+19.Kubernetes 显示命令、配置命令
+
+20.加载、重新加载和保存配置
+
+21环回接口
+
+22.VRF配置
+
+23.复用电缆Muxcable 的显示和配置
+
+24.镜像显示和配置
+
+25.NAT显示和配置命令
+
+26.NTP显示和配置命令
+
+27.PFC看门狗命令
+
+28.平台组件固件显示、配置命令
+
+29.NVGRE 显示、配置命令
+
+30.PBH表显示和配置命令
+
+31.QoS 显示、配置命令
+
+32. auth_type、retransmit、timeout 和 passkey 的全局半径配置显示、配置命令
+33. sFlow 显示命令、配置命令
+34. SNMP 显示、配置命令，包括位置、联系人、社区和用户设置
+35. BGP启动和运行配置显示命令
+
+36.添加或删除静态路由的命令
+
+37.设备上配置的所有子接口显示状态及配置命令
+
+38.系统日志显示和配置命令
+
+39.系统状态
+
+40.VLAN & FDB显示和配置命令
+
+41.VxLAN 和 Vnet 虚拟局域网（显示和配置命令）
+
+42.热重启
+
+43.显示遥测的配置间隔
+
+44.配置水印遥测间隔
+
+45.软件安装和管理：*sonic-package-manager*是一个命令行工具，用于管理（例如安装、升级或卸载）SONiC 包。
+
+46.故障排除命令
+
+47.路由堆栈（Quagga BGP）显示命令
+
+48.ZTP配置和显示命令
+
+
+
